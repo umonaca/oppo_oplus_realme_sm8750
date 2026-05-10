@@ -27,6 +27,11 @@ on:
         required: true
         type: boolean
         default: 'true'
+      selinux_hide_enable:
+        description: '是否应用 SELinux 策略查询隐藏补丁（方案A，默认开启）'
+        required: true
+        type: boolean
+        default: 'true'
       kpm_enable:
         description: '是否开启kpm(builtin-使用(re)sukisu内置kpm, kpn-使用独立kpm实现(支持任意KSU/面具环境); 不需要可保持默认关闭)'
         required: true
@@ -372,6 +377,15 @@ jobs:
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
           fi
           
+      - name: 应用 SELinux 策略查询隐藏补丁
+        if: inputs.selinux_hide_enable
+        run: |
+          cd kernel_workspace
+          echo "正在应用 SELinux 策略查询隐藏补丁..."
+          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/other_patch/70_selinux_hide_policy_query.patch -O ./common/70_selinux_hide_policy_query.patch
+          cd ./common
+          patch -p1 -N -F 3 < 70_selinux_hide_policy_query.patch
+
       - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
         if: inputs.lz4_enable
         run: |
