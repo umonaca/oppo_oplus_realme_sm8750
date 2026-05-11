@@ -375,25 +375,22 @@ jobs:
             cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cd ./KernelSU
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            # Keep upstream KernelSU hook objects linked after the SUSFS patch.
-            if grep -q 'ksu_selinux_hide_init\|ksu_syscall_hook_init\|ksu_syscall_hook_manager_init' kernel/core/init.c; then
+            # Keep upstream KernelSU selinux_hide dependencies linked after the SUSFS patch.
+            if grep -q 'ksu_selinux_hide_init' kernel/core/init.c; then
               grep -q 'hook/lsm_hook.o' kernel/Kbuild || sed -i '/kernelsu-objs += hook\/setuid_hook.o/i\kernelsu-objs += hook/lsm_hook.o' kernel/Kbuild
-              grep -q 'hook/syscall_event_bridge.o' kernel/Kbuild || sed -i '/kernelsu-objs += hook\/setuid_hook.o/a\kernelsu-objs += hook/syscall_event_bridge.o' kernel/Kbuild
-              grep -q 'hook/syscall_hook_manager.o' kernel/Kbuild || sed -i '/kernelsu-objs += hook\/syscall_event_bridge.o/a\kernelsu-objs += hook/syscall_hook_manager.o' kernel/Kbuild
-              grep -q 'hook/tp_marker.o' kernel/Kbuild || sed -i '/kernelsu-objs += hook\/syscall_hook_manager.o/a\kernelsu-objs += hook/tp_marker.o' kernel/Kbuild
               if ! grep -q 'patch_memory.o' kernel/Kbuild; then
                 {
                   echo 'ifeq ($(CONFIG_ARM64),y)'
                   echo 'kernelsu-objs += hook/arm64/patch_memory.o'
-                  echo 'kernelsu-objs += hook/arm64/syscall_hook.o'
                   echo 'else ifeq ($(CONFIG_X86_64),y)'
                   echo 'kernelsu-objs += hook/x86_64/patch_memory.o'
-                  echo 'kernelsu-objs += hook/x86_64/syscall_hook.o'
                   echo 'endif'
                 } >> kernel/Kbuild
               fi
               echo "Restored KernelSU hook objects required by upstream selinux_hide"
             fi
+            # SUSFS may leave stale syscall-hook calls when patching newer KernelSU.
+            sed -i '/ksu_syscall_hook_init();/d;/ksu_syscall_hook_manager_init();/d;/ksu_syscall_hook_manager_exit();/d' kernel/core/init.c
             # Workaround: SUSFS patch removes ksu_late_loaded but latest KernelSU still uses it
             if ! grep -q 'bool ksu_late_loaded;' kernel/core/init.c; then
               sed -i '/^struct cred \*ksu_cred;$/a\bool ksu_late_loaded;' kernel/core/init.c
