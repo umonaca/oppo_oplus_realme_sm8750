@@ -2,11 +2,17 @@ diff --git a/security/selinux/ss/services.c b/security/selinux/ss/services.c
 index e5d1431..f26f7ce 100644
 --- a/security/selinux/ss/services.c
 +++ b/security/selinux/ss/services.c
-@@ -945,6 +945,374 @@ static void avd_init(struct selinux_policy *policy, struct av_decision *avd)
+@@ -945,6 +945,388 @@ static void avd_init(struct selinux_policy *policy, struct av_decision *avd)
  	avd->flags = 0;
  }
  
 +extern struct selinux_policy *backup_sepolicy __attribute__((weak));
++
++/*
++ * KernelSU upstream selinux_hide exposes backup_sepolicy while it keeps a
++ * baseline policy copy. Prefer that policy when it exists; fallback rules are
++ * only for older KSU/SUSFS pins without the upstream backup policy.
++ */
 +
 +struct selinux_hidden_av_rule {
 +	const char *stype;
@@ -17,18 +23,26 @@ index e5d1431..f26f7ce 100644
 +
 +static const struct selinux_hidden_av_rule selinux_hidden_av_rules[] = {
 +	{ "system_server", "system_server", "process", "execmem" },
++	{ "fsck_untrusted", "fsck_untrusted", "capability", "sys_admin" },
++	{ "shell", "su", "process", "transition" },
++	{ "adbd", "adbroot", "binder", "call" },
 +	{ "untrusted_app", "magisk", "binder", "call" },
 +	{ "untrusted_app", "ksu", "binder", "call" },
++	{ "untrusted_app", "ksu_file", "file", "read" },
 +	{ "untrusted_app", "lsposed_file", "file", "read" },
++	{ "untrusted_app", "xposed_data", "file", "read" },
 +	{ "zygote", "adb_data_file", "dir", "search" },
 +};
 +
 +static const char * const selinux_hidden_context_types[] = {
++	"su",
++	"adbroot",
 +	"ksu",
 +	"ksu_file",
 +	"magisk",
 +	"magisk_file",
 +	"lsposed_file",
++	"xposed_data",
 +};
 +
 +static struct selinux_policy *selinux_hidden_backup_policy(void)
@@ -377,7 +391,7 @@ index e5d1431..f26f7ce 100644
  void services_compute_xperms_decision(struct extended_perms_decision *xpermd,
  					struct avtab_node *node)
  {
-@@ -1201,6 +1569,8 @@ void security_compute_av_user(u32 ssid,
+@@ -1201,6 +1583,8 @@ void security_compute_av_user(u32 ssid,
  
  	context_struct_compute_av(policydb, scontext, tcontext, tclass, avd,
  				  NULL);
@@ -386,7 +400,7 @@ index e5d1431..f26f7ce 100644
   out:
  	rcu_read_unlock();
  	return;
-@@ -1544,6 +1914,12 @@ retry:
+@@ -1544,6 +1928,12 @@ retry:
  	policy = rcu_dereference(selinux_state.policy);
  	policydb = &policy->policydb;
  	sidtab = policy->sidtab;
