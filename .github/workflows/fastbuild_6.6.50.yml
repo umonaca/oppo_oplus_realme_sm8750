@@ -341,10 +341,15 @@ jobs:
             wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/other_patch/apk_sign.patch
             patch -p2 -N -F 3 < apk_sign.patch || true
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksu" ]]; then
-            echo "正在配置原版 KernelSU (tiann/KernelSU)..."
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s main
+            echo "Configuring original KernelSU (tiann/KernelSU)..."
+            if [[ "${{ github.event.inputs.susfs_enable }}" == "true" ]]; then
+              echo "SUSFS is not yet compatible with latest tiann/KernelSU; pinning known-good f9c7823..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s f9c7823e3e9a6034c236a3b275132878cbae7f9f
+            else
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s main
+            fi
             cd ./KernelSU
-            KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/tiann/KernelSU/commits?sha=main&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 30000)
+            KSU_VERSION=$(expr $(git rev-list --count HEAD 2>/dev/null || echo 483) + 30000)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
             sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
@@ -375,22 +380,6 @@ jobs:
             cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cd ./KernelSU
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            # Keep upstream KernelSU selinux_hide dependencies linked after the SUSFS patch.
-            if grep -q 'ksu_selinux_hide_init' kernel/core/init.c; then
-              grep -q 'hook/lsm_hook.o' kernel/Kbuild || sed -i '/kernelsu-objs += hook\/setuid_hook.o/i\kernelsu-objs += hook/lsm_hook.o' kernel/Kbuild
-              if ! grep -q 'patch_memory.o' kernel/Kbuild; then
-                {
-                  echo 'ifeq ($(CONFIG_ARM64),y)'
-                  echo 'kernelsu-objs += hook/arm64/patch_memory.o'
-                  echo 'else ifeq ($(CONFIG_X86_64),y)'
-                  echo 'kernelsu-objs += hook/x86_64/patch_memory.o'
-                  echo 'endif'
-                } >> kernel/Kbuild
-              fi
-              echo "Restored KernelSU hook objects required by upstream selinux_hide"
-            fi
-            # SUSFS may leave stale syscall-hook calls when patching newer KernelSU.
-            sed -i '/ksu_syscall_hook_init();/d;/ksu_syscall_hook_manager_init();/d;/ksu_syscall_hook_manager_exit();/d' kernel/core/init.c
             # Workaround: SUSFS patch removes ksu_late_loaded but latest KernelSU still uses it
             if ! grep -q 'bool ksu_late_loaded;' kernel/core/init.c; then
               sed -i '/^struct cred \*ksu_cred;$/a\bool ksu_late_loaded;' kernel/core/init.c
