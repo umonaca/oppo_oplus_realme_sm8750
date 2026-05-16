@@ -343,8 +343,8 @@ jobs:
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksu" ]]; then
             echo "正在配置原版 KernelSU (tiann/KernelSU)..."
             if [[ "${{ github.event.inputs.susfs_enable }}" == "true" ]]; then
-              echo "SUSFS is not yet compatible with upstream KernelSU selinux_hide; pinning known-good 32483 (f9c7823)..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s f9c7823e3e9a6034c236a3b275132878cbae7f9f
+              echo "Testing SUSFS with upstream KernelSU selinux_hide (3f388ef)..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s 3f388ef137c78e1ca0c92c0ada3b8717cdcc4302
             else
               echo "SUSFS disabled; pre-adopting upstream KernelSU selinux_hide (3f388ef)..."
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s 3f388ef137c78e1ca0c92c0ada3b8717cdcc4302
