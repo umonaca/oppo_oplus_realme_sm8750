@@ -341,15 +341,16 @@ jobs:
             patch -p2 -N -F 3 < apk_sign.patch || true
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksu" ]]; then
             echo "正在配置原版 KernelSU (tiann/KernelSU)..."
+            KSU_REF="3e2936410301bb80a4e8412b7d5d3a6e2da5494b"
             if [[ "${{ github.event.inputs.susfs_enable }}" == "true" ]]; then
-              echo "Testing SUSFS with upstream KernelSU selinux_hide (32491/3a1e6ce)..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s 3a1e6ce9abf369082559b83406bdef02301a1bb4
+              echo "Testing SUSFS with upstream KernelSU selinux_hide (${KSU_REF})..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/${KSU_REF}/kernel/setup.sh" | bash -s "${KSU_REF}"
             else
-              echo "SUSFS disabled; using upstream KernelSU selinux_hide (32491/3a1e6ce)..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s 3a1e6ce9abf369082559b83406bdef02301a1bb4
+              echo "SUSFS disabled; using upstream KernelSU selinux_hide (${KSU_REF})..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/${KSU_REF}/kernel/setup.sh" | bash -s "${KSU_REF}"
             fi
             cd ./KernelSU
-            KSU_VERSION=32491
+            KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) + 30000)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
             sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
@@ -379,7 +380,8 @@ jobs:
             echo "正在为原版 KernelSU (tiann/KernelSU)添加补丁..."
             cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cd ./KernelSU
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            patch --dry-run -p1 < 10_enable_susfs_for_ksu.patch
+            patch -p1 < 10_enable_susfs_for_ksu.patch
           fi
           
       - name: 应用 SELinux 策略/上下文查询隐藏补丁
